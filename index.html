@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Cartoon Studio — Browser Edition</title>
+<style>
+:root{--bg:#10131b;--panel:#191f2b;--panel2:#222b3a;--line:#303b4d;--text:#eef3fb;--muted:#9ba9bd;--accent:#70b7ff;--green:#58d6a0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 Inter,system-ui,Arial,sans-serif}
+header{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#141a24;gap:12px}
+.brand{font-weight:800;letter-spacing:.08em}.brand span{color:var(--accent)}.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+button,.filebtn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+button:hover,.filebtn:hover{border-color:var(--accent)}button.primary{background:#2468a7;border-color:#398bd3}button:disabled{opacity:.45;cursor:not-allowed}
+main{display:grid;grid-template-columns:230px minmax(300px,1fr) 260px;gap:12px;padding:12px;min-height:calc(100vh - 62px)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+.panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0;padding:14px;border-bottom:1px solid var(--line)}
+.scene-list{padding:8px;display:grid;gap:6px}.scene-btn{text-align:left;width:100%;display:flex;align-items:center;gap:9px}.scene-btn.active{background:#183b5c;border-color:#4b9fe7}.num{width:24px;height:24px;border-radius:7px;background:#303d50;display:grid;place-items:center;font-size:11px}
+.center{display:flex;flex-direction:column;gap:10px;min-width:0}.viewport{position:relative;background:#080b11;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:420px;flex:1}
+#stage{width:100%;height:100%;display:block;position:absolute;inset:0}.overlay{position:absolute;left:14px;top:12px;pointer-events:none}.overlay strong{display:block;font-size:13px}.overlay small{color:#b8c5d7}
+.view-controls{position:absolute;right:12px;top:12px;display:flex;gap:6px}.view-controls button{background:#151c29dd}
+.transport{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+.transport input[type=range]{flex:1;min-width:100px;accent-color:var(--accent)}.time{font-variant-numeric:tabular-nums;color:var(--muted);min-width:70px}
+.timeline{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.track{display:flex;gap:6px;overflow-x:auto;padding:8px 0}.clip{min-width:90px;flex:1;background:#28374b;border:1px solid #3d536e;border-radius:7px;padding:9px 7px;text-align:center;font-size:11px;cursor:pointer}.clip.active{background:#1b5683;border-color:#70b7ff}
+.controls{padding:12px;display:grid;gap:12px}.field{display:grid;gap:5px}.field label{color:var(--muted);font-size:12px}.field input,.field select,.field textarea{width:100%;background:#101722;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:8px}.field input[type=range]{padding:0;accent-color:var(--accent)}.row{display:flex;gap:7px}.row>*{flex:1}.hint{color:var(--muted);font-size:12px}.status{font-size:12px;color:var(--green);min-height:18px}
+footer{color:var(--muted);font-size:11px;padding:0 14px 12px}
+@media(max-width:900px){main{grid-template-columns:190px 1fr}.right{grid-column:1/-1}.right .controls{grid-template-columns:repeat(2,minmax(0,1fr))}.viewport{min-height:360px}}
+@media(max-width:620px){header{height:auto;min-height:62px;padding:10px;align-items:flex-start;flex-direction:column}main{grid-template-columns:1fr;padding:8px}.left{order:2}.center{order:1}.right{order:3}.scene-list{grid-template-columns:repeat(3,1fr)}.scene-btn{font-size:11px;padding:6px}.num{display:none}.viewport{min-height:300px}.right .controls{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">3D <span>CARTOON</span> STUDIO <small style="color:#9ba9bd;font-weight:500;letter-spacing:0"> / Browser Edition</small></div>
+  <div class="top-actions">
+    <button id="saveBtn">Save Project</button>
+    <label class="filebtn">Load Project<input id="loadFile" type="file" accept=".json,application/json" hidden></label>
+    <button class="primary" id="recordBtn">Record Full Sequence</button>
+  </div>
+</header>
+<main>
+  <aside class="panel left">
+    <h3>Scene Blocks · 9</h3>
+    <div class="scene-list" id="sceneList"></div>
+    <footer>Choose a scene to edit and preview it.</footer>
+  </aside>
+  <section class="center">
+    <div class="viewport">
+      <canvas id="stage"></canvas>
+      <div class="overlay"><strong id="sceneTitle">Scene 01 — City Establishing</strong><small id="sceneSub">3D Preview · 16:9</small></div>
+      <div class="view-controls"><button id="resetCamera">Reset Camera</button><button id="gridBtn">Grid: On</button></div>
+    </div>
+    <div class="transport">
+      <button class="primary" id="playBtn">▶ Play Scene</button>
+      <button id="pauseBtn">Ⅱ Pause</button>
+      <button id="restartBtn">↺ Restart</button>
+      <span class="time" id="clock">0.0 / 4.0s</span>
+      <input id="scrub" type="range" min="0" max="4" step=".1" value="0">
+    </div>
+    <div class="timeline">
+      <strong style="font-size:12px">SEQUENCE TIMELINE</strong>
+      <div class="track" id="track"></div>
+      <div class="hint">Each block is an independently editable scene. Record Full Sequence captures all 9 scenes in order.</div>
+    </div>
+  </section>
+  <aside class="panel right">
+    <h3>Scene Properties</h3>
+    <div class="controls">
+      <div class="field"><label>Scene name</label><input id="nameInput" type="text"></div>
+      <div class="field"><label>Duration (seconds)</label><input id="durationInput" type="number" min="1" max="30" step="1"></div>
+      <div class="field"><label>Camera angle</label><select id="cameraInput"><option>Wide</option><option>Aerial</option><option>Medium</option><option>Close-up</option><option>Low angle</option></select></div>
+      <div class="field"><label>Camera movement</label><select id="moveInput"><option>Static</option><option>Slow Zoom In</option><option>Pan Left</option><option>Pan Right</option><option>Orbit</option></select></div>
+      <div class="field"><label>Lighting</label><select id="lightInput"><option>Daylight</option><option>Sunset</option><option>Studio</option><option>Dramatic</option></select></div>
+      <div class="field"><label>Action / animation note</label><textarea id="actionInput" rows="3"></textarea></div>
+      <div class="field"><label>Scene background</label><select id="backgroundInput"><option>City street</option><option>Open plaza</option><option>Studio</option><option>Competition arena</option></select></div>
+      <div class="row"><button id="applyBtn" class="primary">Apply Changes</button><button id="duplicateBtn">Duplicate</button></div>
+      <div class="status" id="status"></div>
+      <div class="hint">Starter assets are procedural 3D shapes. You can later replace them with licensed GLB/GLTF cartoon characters.</div>
+    </div>
+  </aside>
+</main>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js';
+
+const defaults = [
+ {name:'City Establishing',duration:4,camera:'Aerial',move:'Slow Zoom In',light:'Daylight',action:'Show the city, road, buildings and moving cars.',background:'City street'},
+ {name:'Crowd Introduction',duration:4,camera:'Wide',move:'Pan Left',light:'Daylight',action:'Reveal a crowd gathered around the main event.',background:'Open plaza'},
+ {name:'Character Reaction',duration:3,camera:'Close-up',move:'Static',light:'Daylight',action:'Show surprised and curious facial reactions.',background:'Open plaza'},
+ {name:'Main Character Dialogue',duration:4,camera:'Medium',move:'Slow Zoom In',light:'Studio',action:'Main character speaks and gestures with both hands.',background:'Open plaza'},
+ {name:'Crowd Reaction',duration:4,camera:'Wide',move:'Pan Right',light:'Daylight',action:'Crowd reacts together and looks toward the speaker.',background:'Open plaza'},
+ {name:'Character Lineup',duration:5,camera:'Wide',move:'Static',light:'Daylight',action:'Show the group of characters in a clear lineup.',background:'Competition arena'},
+ {name:'Individual Dialogue',duration:5,camera:'Close-up',move:'Slow Zoom In',light:'Studio',action:'Focus on one character delivering a short line.',background:'Studio'},
+ {name:'Conversation',duration:5,camera:'Medium',move:'Orbit',light:'Daylight',action:'Two characters face each other and talk.',background:'Open plaza'},
+ {name:'Action Ending',duration:4,camera:'Low angle',move:'Pan Left',light:'Dramatic',action:'Guards hurry into the scene as the action builds.',background:'Competition arena'}
+];
+let scenes = structuredClone(defaults), active=0, elapsed=0, playing=false, gridOn=true, recording=false;
+const canvas=document.querySelector('#stage');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene(); scene.background=new THREE.Color('#9bc8e8'); scene.fog=new THREE.Fog('#9bc8e8',22,65);
+const camera=new THREE.PerspectiveCamera(42,1,.1,150); camera.position.set(8,7,13); camera.lookAt(0,1,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x607080,2));
+const sun=new THREE.DirectionalLight(0xffffff,2.4); sun.position.set(-6,12,8); sun.castShadow=true; scene.add(sun);
+const world=new THREE.Group(); scene.add(world);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:'#668b58',roughness:1})); ground.rotation.x=-Math.PI/2; ground.position.y=-.04; ground.receiveShadow=true; world.add(ground);
+const grid=new THREE.GridHelper(50,50,0x52634f,0x81917c); grid.position.y=.01; world.add(grid);
+function mat(color,roughness=.8){return new THREE.MeshStandardMaterial({color,roughness});}
+function box(parent,w,h,d,color,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+function sphere(parent,r,color,x,y,z){const m=new THREE.Mesh(new THREE.SphereGeometry(r,20,16),mat(color));m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;}
+function makePerson(x,z,color='#2877c7',scale=1){
+ const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(scale);
+ const body=box(g,.62,.9,.35,color,0,1.05,0); body.rotation.z=-.03;
+ sphere(g,.31,'#f0bd91',0,1.78,0);
+ sphere(g,.09,'#20242b',-.12,1.82,.26);sphere(g,.09,'#20242b',.12,1.82,.26);
+ box(g,.18,.55,.2,'#263246',-.18,.35,0);box(g,.18,.55,.2,'#263246',.18,.35,0);
+ box(g,.16,.62,.18,color,-.4,1.12,0).rotation.z=-.22;
+ box(g,.16,.62,.18,color,.4,1.12,0).rotation.z=.22;
+ g.userData.arms=g.children.slice(-2);world.add(g);return g;
+}
+const people=[makePerson(-1.7,0,'#2776c8',1.05),makePerson(1.6,-.2,'#e3a52b',1),makePerson(-3,-1.5,'#cf554c',.85),makePerson(3,-1.4,'#48a987',.9),makePerson(-4,1.2,'#845ac7',.85),makePerson(4,1.1,'#e17d39',.85)];
+// simple city blocks
+for(let i=0;i<9;i++){let h=2+Math.random()*4;let b=box(world,2.2,h,2.2,['#d7dce2','#d6b98c','#a8c3d5'][i%3],-9+(i%3)*9,h/2,-9+Math.floor(i/3)*-5);b.material=mat(['#d7dce2','#d6b98c','#a8c3d5'][i%3]);}
+const car=new THREE.Group();box(car,2.1,.55,1.1,'#e44b42',0,.55,0);box(car,1.1,.55,.9,'#a9d7ed',-.1,1.05,0);
+for(const x of [-.68,.68])for(const z of [-.56,.56]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,.16,20),mat('#20242a'));w.rotation.x=Math.PI/2;w.position.set(x,.3,z);car.add(w)}
+car.position.set(-5,0,3);world.add(car);
+const label=document.querySelector('#sceneTitle'),sub=document.querySelector('#sceneSub');
+function setLighting(mode){sun.intensity=mode==='Dramatic'?3.5:mode==='Studio'?2.8:mode==='Sunset'?1.4:2.4;scene.background=new THREE.Color(mode==='Dramatic'?'#27334d':mode==='Sunset'?'#e9a477':mode==='Studio'?'#b8c2d0':'#9bc8e8');scene.fog.color.copy(scene.background);}
+function setCamera(s){let p={Wide:[8,6,13],Aerial:[0,15,10],Medium:[5,4,8],'Close-up':[2.4,2.8,5],'Low angle':[7,2.1,10]}[s.camera]||[8,6,13];camera.position.set(...p);camera.lookAt(0,1,0);camera.fov=s.camera==='Close-up'?32:42;camera.updateProjectionMatrix();}
+function setScene(i){active=i;elapsed=0;playing=false;const s=scenes[i];label.textContent=`Scene ${String(i+1).padStart(2,'0')} — ${s.name}`;sub.textContent=`${s.duration}s · ${s.camera} · ${s.move}`;setCamera(s);setLighting(s.light);
+ people.forEach((p,j)=>{p.visible=i!==0&&(i!==6||j===0);p.position.x=[-1.7,1.6,-3,3,-4,4][j];p.position.z=[0,-.2,-1.5,-1.4,1.2,1.1][j];});
+ car.visible=i===0||i===1;car.position.x=i===0?-5:-3;
+ if(i===0){people.forEach(p=>p.visible=false)} if(i===2||i===6){people.forEach((p,j)=>p.visible=j===(i===2?1:0));}
+ if(i===3){people.forEach((p,j)=>p.visible=j===0)} if(i===7){people.forEach((p,j)=>p.visible=j<2)}
+ if(i===8){people.forEach((p,j)=>p.visible=j===0||j===3||j===5)}
+ document.querySelectorAll('.scene-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+ document.querySelectorAll('.clip').forEach((b,j)=>b.classList.toggle('active',j===i));
+ document.querySelector('#scrub').max=s.duration;document.querySelector('#scrub').value=0;document.querySelector('#clock').textContent=`0.0 / ${s.duration.toFixed(1)}s`;
+ fillProperties();updateCameraMove(0);
+}
+function updateCameraMove(t){const s=scenes[active];const k=Math.min(t/s.duration,1);if(s.move==='Slow Zoom In'){camera.position.lerpVectors(new THREE.Vector3(...({Wide:[8,6,13],Aerial:[0,15,10],Medium:[5,4,8],'Close-up':[2.4,2.8,5],'Low angle':[7,2.1,10]}[s.camera]||[8,6,13])),new THREE.Vector3(2.8,3.2,6),k*.35);camera.lookAt(0,1,0)}else if(s.move==='Pan Left'||s.move==='Pan Right'){camera.position.x=(s.move==='Pan Left'?1:-1)*k*3+(s.camera==='Wide'?8:5);camera.lookAt(0,1,0)}else if(s.move==='Orbit'){camera.position.x=8*Math.cos(k*Math.PI*2);camera.position.z=8*Math.sin(k*Math.PI*2);camera.lookAt(0,1,0)}}
+function fillProperties(){const s=scenes[active];document.querySelector('#nameInput').value=s.name;document.querySelector('#durationInput').value=s.duration;document.querySelector('#cameraInput').value=s.camera;document.querySelector('#moveInput').value=s.move;document.querySelector('#lightInput').value=s.light;document.querySelector('#actionInput').value=s.action;document.querySelector('#backgroundInput').value=s.background;}
+function buildLists(){const list=document.querySelector('#sceneList'),track=document.querySelector('#track');list.innerHTML='';track.innerHTML='';scenes.forEach((s,i)=>{let b=document.createElement('button');b.className='scene-btn';b.innerHTML=`<span class="num">${i+1}</span><span>${s.name}</span>`;b.onclick=()=>setScene(i);list.append(b);let c=document.createElement('div');c.className='clip';c.textContent=`${i+1}. ${s.name} · ${s.duration}s`;c.onclick=()=>setScene(i);track.append(c)});}
+function apply(){const s=scenes[active];s.name=document.querySelector('#nameInput').value||`Scene ${active+1}`;s.duration=Math.max(1,Math.min(30,Number(document.querySelector('#durationInput').value)||4));s.camera=document.querySelector('#cameraInput').value;s.move=document.querySelector('#moveInput').value;s.light=document.querySelector('#lightInput').value;s.action=document.querySelector('#actionInput').value;s.background=document.querySelector('#backgroundInput').value;buildLists();setScene(active);document.querySelector('#status').textContent='Scene settings applied.';}
+document.querySelector('#applyBtn').onclick=apply;
+document.querySelector('#duplicateBtn').onclick=()=>{scenes.splice(active+1,0,{...scenes[active],name:scenes[active].name+' Copy'});buildLists();setScene(active+1);document.querySelector('#status').textContent='Scene duplicated.'};
+document.querySelector('#playBtn').onclick=()=>{playing=true;};
+document.querySelector('#pauseBtn').onclick=()=>{playing=false;};
+document.querySelector('#restartBtn').onclick=()=>{elapsed=0;playing=true;};
+document.querySelector('#scrub').oninput=e=>{elapsed=Number(e.target.value);updateCameraMove(elapsed)};
+document.querySelector('#resetCamera').onclick=()=>setCamera(scenes[active]);
+document.querySelector('#gridBtn').onclick=()=>{gridOn=!gridOn;grid.visible=gridOn;document.querySelector('#gridBtn').textContent=`Grid: ${gridOn?'On':'Off'}`};
+document.querySelector('#saveBtn').onclick=()=>{const blob=new Blob([JSON.stringify({app:'3D Cartoon Studio',version:1,scenes},null,2)],{type:'application/json'});download(blob,'cartoon-studio-project.json');};
+document.querySelector('#loadFile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(!Array.isArray(obj.scenes))throw Error('Invalid project');scenes=obj.scenes;buildLists();setScene(0);document.querySelector('#status').textContent='Project loaded.';}catch(err){document.querySelector('#status').textContent='Could not load this project JSON.'}};
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+let recorder, chunks=[];
+document.querySelector('#recordBtn').onclick=async()=>{if(recording)return;try{const stream=renderer.domElement.captureStream(30);const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';recorder=new MediaRecorder(stream,{mimeType:mime});chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=()=>{download(new Blob(chunks,{type:'video/webm'}),'cartoon-studio-sequence.webm');document.querySelector('#recordBtn').textContent='Record Full Sequence';document.querySelector('#status').textContent='Sequence recording downloaded as WebM.';recording=false;};recorder.start();recording=true;document.querySelector('#recordBtn').textContent='Recording…';document.querySelector('#status').textContent='Recording all scenes. Keep this tab open.';playing=false;let idx=0;const next=()=>{if(idx>=scenes.length){recorder.stop();return;}setScene(idx);playing=true;const ms=scenes[idx].duration*1000;idx++;setTimeout(next,ms);};next();}catch(err){document.querySelector('#status').textContent='Recording is not supported in this browser.';recording=false;}};
+let last=performance.now();
+function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(canvas.parentElement);resize();buildLists();setScene(0);
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;if(playing){elapsed+=dt;if(elapsed>=scenes[active].duration){elapsed=scenes[active].duration;playing=false;}updateCameraMove(elapsed);people.forEach((p,j)=>{if(p.visible){p.position.y=Math.abs(Math.sin(now*.003+j))*0.06;if(j<2){p.rotation.y=Math.sin(now*.0015+j)*.12;}}});car.position.x=-5+Math.sin(now*.0005)*2;}document.querySelector('#scrub').value=elapsed;document.querySelector('#clock').textContent=`${elapsed.toFixed(1)} / ${scenes[active].duration.toFixed(1)}s`;renderer.render(scene,camera);}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
